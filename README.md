@@ -10,12 +10,9 @@
 
 ## Screenshots
 
-> _Replace this section with actual screenshots after first run._
->
-> Drag a screenshot into the `screenshots/` folder and reference it here:
-> ```
-> ![WebP Crunchr main window](screenshots/main_window.png)
-> ```
+![WebP Crunchr — empty state](screenshots/empty_state.png)
+
+![WebP Crunchr — results after conversion](screenshots/results_state.png)
 
 ---
 

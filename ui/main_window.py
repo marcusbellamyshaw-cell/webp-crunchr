@@ -12,7 +12,7 @@ from PyQt6.QtGui import QDragEnterEvent, QDropEvent
 from ui.drop_zone import DropZone
 from ui.file_list import FileListWidget, FileEntry
 from core.file_utils import format_size, output_path, collect_files
-from core.converter import convert, cwebp_available, HEIC_SUPPORTED
+from core.converter import convert, cwebp_available, HEIC_SUPPORTED, ENCODER_PILLOW, ENCODER_CWEBP, ENCODER_BEST
 
 
 DARK_STYLE = """
@@ -101,11 +101,11 @@ class ConversionWorker(QObject):
     file_done = pyqtSignal(str, int, str)     # path, output_size, error
     finished = pyqtSignal()
 
-    def __init__(self, entries: list[FileEntry], quality: int, use_cwebp: bool):
+    def __init__(self, entries: list[FileEntry], quality: int, encoder: str):
         super().__init__()
         self._entries = entries
         self._quality = quality
-        self._use_cwebp = use_cwebp
+        self._encoder = encoder
         self._cancelled = False
 
     def cancel(self):
@@ -118,7 +118,7 @@ class ConversionWorker(QObject):
                 break
             dest = output_path(entry.path, entry.output_dir)
             try:
-                convert(entry.path, dest, self._quality, self._use_cwebp)
+                convert(entry.path, dest, self._quality, self._encoder)
                 size = Path(dest).stat().st_size
                 self.file_done.emit(entry.path, size, "")
             except Exception as exc:
@@ -196,15 +196,20 @@ class MainWindow(QMainWindow):
         opts_row.addWidget(QLabel("Encoder:"))
         self._encoder_group = QButtonGroup(self)
         self._radio_pillow = QRadioButton("Pillow")
-        self._radio_cwebp = QRadioButton("cwebp")
+        self._radio_cwebp  = QRadioButton("cwebp")
+        self._radio_best   = QRadioButton("Best (try both)")
         if not cwebp_available():
-            self._radio_cwebp.setEnabled(False)
-            self._radio_cwebp.setToolTip("cwebp not found")
+            for r in (self._radio_cwebp, self._radio_best):
+                r.setEnabled(False)
+                r.setToolTip("cwebp not found")
         self._encoder_group.addButton(self._radio_pillow)
         self._encoder_group.addButton(self._radio_cwebp)
-        self._radio_pillow.setChecked(True)   # must be after addButton so group exclusivity is set
+        self._encoder_group.addButton(self._radio_best)
+        # Default to cwebp — it's bundled and consistently produces smaller files
+        self._radio_cwebp.setChecked(True)
         opts_row.addWidget(self._radio_pillow)
         opts_row.addWidget(self._radio_cwebp)
+        opts_row.addWidget(self._radio_best)
         if not HEIC_SUPPORTED:
             heic_label = QLabel("⚠ HEIC support unavailable (install pillow-heif)")
             heic_label.setStyleSheet("color: #f9a825; font-size: 11px;")
@@ -294,7 +299,12 @@ class MainWindow(QMainWindow):
             return
 
         quality = self.quality_slider.value()
-        use_cwebp = self._radio_cwebp.isChecked()
+        if self._radio_best.isChecked():
+            encoder = ENCODER_BEST
+        elif self._radio_cwebp.isChecked():
+            encoder = ENCODER_CWEBP
+        else:
+            encoder = ENCODER_PILLOW
 
         self.crunch_btn.setEnabled(False)
         self.progress_bar.setRange(0, len(entries))
@@ -305,7 +315,7 @@ class MainWindow(QMainWindow):
         for e in entries:
             self.file_list.update_entry(e.path, status="processing")
 
-        self._worker = ConversionWorker(entries, quality, use_cwebp)
+        self._worker = ConversionWorker(entries, quality, encoder)
         self._thread = QThread()
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
