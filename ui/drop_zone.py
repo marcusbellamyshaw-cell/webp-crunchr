@@ -2,15 +2,14 @@ from PyQt6.QtWidgets import QLabel, QFileDialog
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QMouseEvent
 
-from core.file_utils import is_supported
-
 
 class DropZone(QLabel):
+    # Emits raw paths — files AND directories. MainWindow expands directories.
     files_dropped = pyqtSignal(list)
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setText("Drop images here\nor click to browse")
+        self.setText("Drop images or folders here\nor click to browse")
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setAcceptDrops(True)
         self.setMinimumHeight(160)
@@ -41,9 +40,8 @@ class DropZone(QLabel):
     def dropEvent(self, event: QDropEvent):
         self._apply_style(False)
         paths = [u.toLocalFile() for u in event.mimeData().urls()]
-        valid = [p for p in paths if is_supported(p)]
-        if valid:
-            self.files_dropped.emit(valid)
+        if paths:
+            self.files_dropped.emit(paths)
 
     def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -53,6 +51,5 @@ class DropZone(QLabel):
                 "",
                 "Images (*.jpg *.jpeg *.png *.gif *.bmp *.tiff *.tif *.heic)",
             )
-            valid = [p for p in paths if is_supported(p)]
-            if valid:
-                self.files_dropped.emit(valid)
+            if paths:
+                self.files_dropped.emit(paths)

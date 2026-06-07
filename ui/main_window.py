@@ -11,7 +11,7 @@ from PyQt6.QtGui import QDragEnterEvent, QDropEvent
 
 from ui.drop_zone import DropZone
 from ui.file_list import FileListWidget, FileEntry
-from core.file_utils import format_size, output_path
+from core.file_utils import format_size, output_path, collect_files
 from core.converter import convert, cwebp_available, HEIC_SUPPORTED
 
 
@@ -124,7 +124,7 @@ class MainWindow(QMainWindow):
 
         # Drop zone
         self.drop_zone = DropZone()
-        self.drop_zone.files_dropped.connect(self._add_files)
+        self.drop_zone.files_dropped.connect(self._on_paths_received)
         layout.addWidget(self.drop_zone)
 
         # File list
@@ -145,6 +145,17 @@ class MainWindow(QMainWindow):
         clear_out_btn.clicked.connect(self._clear_output_dir)
         out_row.addWidget(clear_out_btn)
         layout.addLayout(out_row)
+
+        # Add folder row
+        folder_row = QHBoxLayout()
+        add_folder_btn = QPushButton("Add Folder…")
+        add_folder_btn.clicked.connect(self._pick_input_folder)
+        folder_row.addWidget(add_folder_btn)
+        self.subfolder_check = QCheckBox("Include subfolders")
+        self.subfolder_check.setChecked(True)
+        folder_row.addWidget(self.subfolder_check)
+        folder_row.addStretch()
+        layout.addLayout(folder_row)
 
         # Quality + cwebp row
         opts_row = QHBoxLayout()
@@ -199,6 +210,14 @@ class MainWindow(QMainWindow):
     def _on_quality_change(self, value: int):
         self.quality_label.setText(str(value))
 
+    def _on_paths_received(self, paths: list[str]):
+        """Expand directories into individual files, then add to queue."""
+        recursive = self.subfolder_check.isChecked()
+        file_paths = []
+        for p in paths:
+            file_paths.extend(collect_files(p, recursive=recursive))
+        self._add_files(file_paths)
+
     def _add_files(self, paths: list[str]):
         entries = []
         for p in paths:
@@ -210,12 +229,16 @@ class MainWindow(QMainWindow):
         self.file_list.add_entries(entries)
         self.summary_label.setVisible(False)
 
+    def _pick_input_folder(self):
+        d = QFileDialog.getExistingDirectory(self, "Select Input Folder")
+        if d:
+            self._on_paths_received([d])
+
     def _pick_output_dir(self):
         d = QFileDialog.getExistingDirectory(self, "Select Output Folder")
         if d:
             self._output_dir = d
             self.out_dir_edit.setText(d)
-            # Propagate to queued entries
             for e in self.file_list.entries():
                 if e.status == "queued":
                     e.output_dir = d

@@ -8,6 +8,20 @@ def is_supported(path: str) -> bool:
     return Path(path).suffix.lower() in SUPPORTED_EXTENSIONS
 
 
+def collect_files(path: str, recursive: bool = True) -> list[str]:
+    """Return supported image files under path. If path is a file, return it (if supported)."""
+    p = Path(path)
+    if p.is_file():
+        return [str(p)] if is_supported(str(p)) else []
+    if p.is_dir():
+        pattern = "**/*" if recursive else "*"
+        return sorted(
+            str(f) for f in p.glob(pattern)
+            if f.is_file() and is_supported(str(f))
+        )
+    return []
+
+
 def format_size(bytes_: int) -> str:
     if bytes_ < 1024:
         return f"{bytes_} B"
