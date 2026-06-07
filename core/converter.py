@@ -1,6 +1,7 @@
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 from PIL import Image
@@ -13,8 +14,23 @@ except ImportError:
     HEIC_SUPPORTED = False
 
 
+def _cwebp_path() -> str | None:
+    """Return path to cwebp: bundled copy first, then system PATH."""
+    # PyInstaller sets sys._MEIPASS when running from a compiled .exe
+    if hasattr(sys, "_MEIPASS"):
+        bundled = Path(sys._MEIPASS) / "cwebp.exe"
+        if bundled.exists():
+            return str(bundled)
+    # Development: check vendor/ relative to this file
+    vendor = Path(__file__).parent.parent / "vendor" / "cwebp.exe"
+    if vendor.exists():
+        return str(vendor)
+    # Fall back to system PATH
+    return shutil.which("cwebp")
+
+
 def cwebp_available() -> bool:
-    return shutil.which("cwebp") is not None
+    return _cwebp_path() is not None
 
 
 def convert_with_pillow(src: str, dest: str, quality: int) -> None:
@@ -42,8 +58,9 @@ def convert_with_pillow(src: str, dest: str, quality: int) -> None:
 
 
 def convert_with_cwebp(src: str, dest: str, quality: int) -> None:
+    exe = _cwebp_path()
     cmd = [
-        "cwebp",
+        exe,
         "-q", str(quality),
         "-m", "6",
         "-metadata", "none",

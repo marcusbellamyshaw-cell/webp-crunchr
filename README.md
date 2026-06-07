@@ -97,7 +97,7 @@ python main.py
 WebP Crunchr auto-detects `cwebp` at startup — just restart the app after adding it to PATH.
 
 > **Does cwebp work with the compiled `.exe`?**
-> Yes — but it must be installed separately on each machine. The PyInstaller bundle does **not** include `cwebp.exe` itself; the app shells out to whatever `cwebp` it finds on the system PATH at runtime. If `cwebp` is not on PATH, the checkbox stays greyed out and Pillow is used automatically — nothing breaks.
+> Yes — `cwebp.exe` is **bundled inside the `.exe`** (see `vendor/`). No separate installation needed. The app checks for the bundled copy first, then falls back to any `cwebp` on your system PATH, then silently uses Pillow. The "Use cwebp" checkbox will be active out of the box.
 
 ---
 
@@ -122,6 +122,19 @@ The compiled executable will be placed in `dist\WebP Crunchr.exe`. No Python ins
 4. Open a Pull Request describing what changed and why
 
 Please keep PRs focused — one feature or fix per PR.
+
+---
+
+## About
+
+**App design & product direction** — [Marcus Shaw](https://github.com/marcusbellamyshaw-cell)  
+**Code** — [Claude Code](https://claude.ai/code) by Anthropic
+
+---
+
+## Third-party licenses
+
+WebP Crunchr bundles `cwebp.exe` from Google's [libwebp](https://chromium.googlesource.com/webm/libwebp) project, which is licensed under the **BSD 3-Clause License**. The full license text is included in `vendor/LIBWEBP_LICENSE.txt` and reproduced inside the compiled `.exe`.
 
 ---
 
