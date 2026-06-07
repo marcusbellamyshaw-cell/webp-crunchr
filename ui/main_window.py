@@ -4,7 +4,7 @@ from pathlib import Path
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QSlider, QLineEdit, QFileDialog,
-    QProgressBar, QCheckBox, QSizePolicy, QMessageBox,
+    QProgressBar, QCheckBox, QSizePolicy, QMessageBox, QRadioButton, QButtonGroup,
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent
@@ -170,11 +170,18 @@ class MainWindow(QMainWindow):
         self.quality_label.setFixedWidth(28)
         opts_row.addWidget(self.quality_label)
         opts_row.addSpacing(20)
-        self.cwebp_check = QCheckBox("Use cwebp (if available)")
-        self.cwebp_check.setEnabled(cwebp_available())
+        opts_row.addWidget(QLabel("Encoder:"))
+        self._encoder_group = QButtonGroup(self)
+        self._radio_pillow = QRadioButton("Pillow")
+        self._radio_cwebp = QRadioButton("cwebp")
+        self._radio_pillow.setChecked(True)
         if not cwebp_available():
-            self.cwebp_check.setToolTip("cwebp not found on PATH")
-        opts_row.addWidget(self.cwebp_check)
+            self._radio_cwebp.setEnabled(False)
+            self._radio_cwebp.setToolTip("cwebp not found")
+        self._encoder_group.addButton(self._radio_pillow)
+        self._encoder_group.addButton(self._radio_cwebp)
+        opts_row.addWidget(self._radio_pillow)
+        opts_row.addWidget(self._radio_cwebp)
         if not HEIC_SUPPORTED:
             heic_label = QLabel("⚠ HEIC support unavailable (install pillow-heif)")
             heic_label.setStyleSheet("color: #f9a825; font-size: 11px;")
@@ -264,7 +271,7 @@ class MainWindow(QMainWindow):
             return
 
         quality = self.quality_slider.value()
-        use_cwebp = self.cwebp_check.isChecked()
+        use_cwebp = self._radio_cwebp.isChecked()
 
         self.crunch_btn.setEnabled(False)
         self.progress_bar.setRange(0, len(entries))
