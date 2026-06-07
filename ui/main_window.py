@@ -70,6 +70,29 @@ QProgressBar {
 QProgressBar::chunk { background: #00bcd4; border-radius: 3px; }
 QCheckBox { color: #aaa; }
 QCheckBox::indicator { width: 14px; height: 14px; }
+QRadioButton {
+    color: #ddd;
+    spacing: 6px;
+}
+QRadioButton::indicator {
+    width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    border: 2px solid #666;
+    background: #1e1e1e;
+}
+QRadioButton::indicator:hover {
+    border-color: #00bcd4;
+}
+QRadioButton::indicator:checked {
+    border: 2px solid #00bcd4;
+    background: #00bcd4;
+}
+QRadioButton::indicator:disabled {
+    border-color: #3a3a3a;
+    background: #1a1a1a;
+}
+QRadioButton:disabled { color: #555; }
 """
 
 
@@ -174,12 +197,12 @@ class MainWindow(QMainWindow):
         self._encoder_group = QButtonGroup(self)
         self._radio_pillow = QRadioButton("Pillow")
         self._radio_cwebp = QRadioButton("cwebp")
-        self._radio_pillow.setChecked(True)
         if not cwebp_available():
             self._radio_cwebp.setEnabled(False)
             self._radio_cwebp.setToolTip("cwebp not found")
         self._encoder_group.addButton(self._radio_pillow)
         self._encoder_group.addButton(self._radio_cwebp)
+        self._radio_pillow.setChecked(True)   # must be after addButton so group exclusivity is set
         opts_row.addWidget(self._radio_pillow)
         opts_row.addWidget(self._radio_cwebp)
         if not HEIC_SUPPORTED:
