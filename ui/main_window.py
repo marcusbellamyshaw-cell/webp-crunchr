@@ -1,4 +1,5 @@
 import os
+import subprocess
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
@@ -6,8 +7,8 @@ from PyQt6.QtWidgets import (
     QPushButton, QLabel, QSlider, QLineEdit, QFileDialog,
     QProgressBar, QCheckBox, QSizePolicy, QMessageBox, QRadioButton, QButtonGroup,
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject
-from PyQt6.QtGui import QDragEnterEvent, QDropEvent
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject, QUrl
+from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QDesktopServices
 
 from ui.drop_zone import DropZone
 from ui.file_list import FileListWidget, FileEntry
@@ -97,15 +98,18 @@ QRadioButton:disabled { color: #555; }
 
 
 class ConversionWorker(QObject):
-    progress = pyqtSignal(int, int)           # current, total
-    file_done = pyqtSignal(str, int, str)     # path, output_size, error
+    progress = pyqtSignal(int, int)               # current, total
+    file_done = pyqtSignal(str, int, str, str)    # path, output_size, error, status
     finished = pyqtSignal()
 
-    def __init__(self, entries: list[FileEntry], quality: int, encoder: str):
+    def __init__(self, entries: list[FileEntry], quality: int, encoder: str,
+                 lossless: bool = False, skip_if_larger: bool = False):
         super().__init__()
         self._entries = entries
         self._quality = quality
         self._encoder = encoder
+        self._lossless = lossless
+        self._skip_if_larger = skip_if_larger
         self._cancelled = False
 
     def cancel(self):
@@ -118,11 +122,19 @@ class ConversionWorker(QObject):
                 break
             dest = output_path(entry.path, entry.output_dir)
             try:
-                convert(entry.path, dest, self._quality, self._encoder)
-                size = Path(dest).stat().st_size
-                self.file_done.emit(entry.path, size, "")
+                result = convert(
+                    entry.path, dest, self._quality,
+                    encoder=self._encoder,
+                    lossless=self._lossless,
+                    skip_if_larger=self._skip_if_larger,
+                )
+                if result == "skipped":
+                    self.file_done.emit(entry.path, 0, "", "skipped")
+                else:
+                    size = Path(dest).stat().st_size
+                    self.file_done.emit(entry.path, size, "", "done")
             except Exception as exc:
-                self.file_done.emit(entry.path, -1, str(exc))
+                self.file_done.emit(entry.path, -1, str(exc), "error")
             self.progress.emit(i + 1, total)
         self.finished.emit()
 
@@ -169,7 +181,7 @@ class MainWindow(QMainWindow):
         out_row.addWidget(clear_out_btn)
         layout.addLayout(out_row)
 
-        # Add folder row
+        # Add folder + subfolder row
         folder_row = QHBoxLayout()
         add_folder_btn = QPushButton("Add Folder…")
         add_folder_btn.clicked.connect(self._pick_input_folder)
@@ -180,7 +192,7 @@ class MainWindow(QMainWindow):
         folder_row.addStretch()
         layout.addLayout(folder_row)
 
-        # Quality + cwebp row
+        # Quality + encoder row
         opts_row = QHBoxLayout()
         opts_row.addWidget(QLabel("Quality:"))
         self.quality_slider = QSlider(Qt.Orientation.Horizontal)
@@ -205,7 +217,6 @@ class MainWindow(QMainWindow):
         self._encoder_group.addButton(self._radio_pillow)
         self._encoder_group.addButton(self._radio_cwebp)
         self._encoder_group.addButton(self._radio_best)
-        # Default to cwebp — it's bundled and consistently produces smaller files
         self._radio_cwebp.setChecked(True)
         opts_row.addWidget(self._radio_pillow)
         opts_row.addWidget(self._radio_cwebp)
@@ -218,17 +229,36 @@ class MainWindow(QMainWindow):
         opts_row.addStretch()
         layout.addLayout(opts_row)
 
+        # Extra options row
+        extra_row = QHBoxLayout()
+        self.lossless_check = QCheckBox("Lossless")
+        self.lossless_check.setToolTip("Encode as lossless WebP — larger files but pixel-perfect. Best for logos and text graphics.")
+        extra_row.addWidget(self.lossless_check)
+        extra_row.addSpacing(16)
+        self.skip_larger_check = QCheckBox("Skip if output is larger")
+        self.skip_larger_check.setToolTip("Don't write the .webp file if it ends up bigger than the source.")
+        self.skip_larger_check.setChecked(True)
+        extra_row.addWidget(self.skip_larger_check)
+        extra_row.addStretch()
+        layout.addLayout(extra_row)
+
         # Progress bar
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
         layout.addWidget(self.progress_bar)
 
-        # Summary label
+        # Summary + open folder row
+        summary_row = QHBoxLayout()
         self.summary_label = QLabel("")
-        self.summary_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.summary_label.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         self.summary_label.setStyleSheet("color: #4caf50; font-size: 13px;")
         self.summary_label.setVisible(False)
-        layout.addWidget(self.summary_label)
+        summary_row.addWidget(self.summary_label, stretch=1)
+        self.open_folder_btn = QPushButton("Open Folder")
+        self.open_folder_btn.setVisible(False)
+        self.open_folder_btn.clicked.connect(self._open_output_folder)
+        summary_row.addWidget(self.open_folder_btn)
+        layout.addLayout(summary_row)
 
         # Action buttons row
         btn_row = QHBoxLayout()
@@ -236,6 +266,12 @@ class MainWindow(QMainWindow):
         self.clear_btn.clicked.connect(self._clear_list)
         btn_row.addWidget(self.clear_btn)
         btn_row.addStretch()
+        # Attribution link
+        attr_label = QLabel('<a href="https://everybittexas.com/" style="color:#29b6f6; text-decoration:none;">Brought to you by Every Bit Texas</a>')
+        attr_label.setOpenExternalLinks(True)
+        attr_label.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        btn_row.addWidget(attr_label)
+        btn_row.addSpacing(16)
         self.crunch_btn = QPushButton("Crunch 'em")
         self.crunch_btn.setObjectName("crunch_btn")
         self.crunch_btn.clicked.connect(self._start_conversion)
@@ -291,6 +327,7 @@ class MainWindow(QMainWindow):
         self.file_list.clear_entries()
         self.summary_label.setVisible(False)
         self.progress_bar.setVisible(False)
+        self.open_folder_btn.setVisible(False)
 
     def _start_conversion(self):
         entries = [e for e in self.file_list.entries() if e.status == "queued"]
@@ -306,7 +343,11 @@ class MainWindow(QMainWindow):
         else:
             encoder = ENCODER_PILLOW
 
+        lossless = self.lossless_check.isChecked()
+        skip_if_larger = self.skip_larger_check.isChecked()
+
         self.crunch_btn.setEnabled(False)
+        self.open_folder_btn.setVisible(False)
         self.progress_bar.setRange(0, len(entries))
         self.progress_bar.setValue(0)
         self.progress_bar.setVisible(True)
@@ -315,7 +356,7 @@ class MainWindow(QMainWindow):
         for e in entries:
             self.file_list.update_entry(e.path, status="processing")
 
-        self._worker = ConversionWorker(entries, quality, encoder)
+        self._worker = ConversionWorker(entries, quality, encoder, lossless, skip_if_larger)
         self._thread = QThread()
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
@@ -330,32 +371,49 @@ class MainWindow(QMainWindow):
     def _on_progress(self, current: int, total: int):
         self.progress_bar.setValue(current)
 
-    def _on_file_done(self, path: str, output_size: int, error: str):
-        if error:
+    def _on_file_done(self, path: str, output_size: int, error: str, status: str):
+        if status == "error":
             self.file_list.update_entry(path, status="error", error_msg=error)
+        elif status == "skipped":
+            self.file_list.update_entry(path, status="skipped")
         else:
             self.file_list.update_entry(path, status="done", output_size=output_size)
 
     def _on_finished(self):
         self.crunch_btn.setEnabled(True)
+        self.progress_bar.setVisible(False)
         self._show_summary()
+
+    def _open_output_folder(self):
+        entries = self.file_list.entries()
+        done = [e for e in entries if e.status in ("done", "skipped")]
+        if not done:
+            return
+        # Use the first done entry's output dir (or source dir if default)
+        e = done[0]
+        folder = e.output_dir if e.output_dir else str(Path(e.path).parent)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(folder))
 
     def _show_summary(self):
         entries = self.file_list.entries()
-        done = [e for e in entries if e.status == "done" and e.output_size is not None]
-        errors = [e for e in entries if e.status == "error"]
-        if not done:
+        done    = [e for e in entries if e.status == "done" and e.output_size is not None]
+        skipped = [e for e in entries if e.status == "skipped"]
+        errors  = [e for e in entries if e.status == "error"]
+        if not done and not skipped:
             return
-        total_in = sum(e.original_size for e in done)
-        total_out = sum(e.output_size for e in done)
-        saved = total_in - total_out
-        pct = (saved / total_in * 100) if total_in else 0
-        msg = (
-            f"✅ {len(done)} file(s) converted  —  "
-            f"{format_size(total_in)} → {format_size(total_out)}  "
-            f"({pct:.1f}% saved)"
-        )
+        parts = []
+        if done:
+            total_in  = sum(e.original_size for e in done)
+            total_out = sum(e.output_size for e in done)
+            pct = (1 - total_out / total_in) * 100 if total_in else 0
+            parts.append(
+                f"✅ {len(done)} converted  —  "
+                f"{format_size(total_in)} → {format_size(total_out)} ({pct:.1f}% saved)"
+            )
+        if skipped:
+            parts.append(f"⏭ {len(skipped)} skipped (already smallest)")
         if errors:
-            msg += f"  ⚠ {len(errors)} error(s)"
-        self.summary_label.setText(msg)
+            parts.append(f"⚠ {len(errors)} error(s)")
+        self.summary_label.setText("   ".join(parts))
         self.summary_label.setVisible(True)
+        self.open_folder_btn.setVisible(True)

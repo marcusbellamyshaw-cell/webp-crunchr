@@ -24,6 +24,7 @@ STATUS_ICONS = {
     "queued":     "⏳",
     "processing": "⚙️",
     "done":       "✅",
+    "skipped":    "⏭",
     "error":      "❌",
 }
 
@@ -31,6 +32,7 @@ STATUS_COLORS = {
     "queued":     QColor("#888888"),
     "processing": QColor("#00bcd4"),
     "done":       QColor("#4caf50"),
+    "skipped":    QColor("#f9a825"),
     "error":      QColor("#f44336"),
 }
 
