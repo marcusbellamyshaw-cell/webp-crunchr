@@ -229,16 +229,31 @@ class MainWindow(QMainWindow):
         opts_row.addStretch()
         layout.addLayout(opts_row)
 
-        # Extra options row
+        # Extra options row — radio pairs for lossless and skip-if-larger
         extra_row = QHBoxLayout()
-        self.lossless_check = QCheckBox("Lossless")
-        self.lossless_check.setToolTip("Encode as lossless WebP — larger files but pixel-perfect. Best for logos and text graphics.")
-        extra_row.addWidget(self.lossless_check)
-        extra_row.addSpacing(16)
-        self.skip_larger_check = QCheckBox("Skip if output is larger")
-        self.skip_larger_check.setToolTip("Don't write the .webp file if it ends up bigger than the source.")
-        self.skip_larger_check.setChecked(True)
-        extra_row.addWidget(self.skip_larger_check)
+        extra_row.addWidget(QLabel("Mode:"))
+        self._mode_group = QButtonGroup(self)
+        self._radio_lossy    = QRadioButton("Lossy")
+        self._radio_lossless = QRadioButton("Lossless")
+        self._radio_lossy.setToolTip("Standard lossy WebP — smallest files, tuned by the quality slider")
+        self._radio_lossless.setToolTip("Lossless WebP — pixel-perfect, best for logos and text. Quality slider is ignored.")
+        self._mode_group.addButton(self._radio_lossy)
+        self._mode_group.addButton(self._radio_lossless)
+        self._radio_lossy.setChecked(True)
+        extra_row.addWidget(self._radio_lossy)
+        extra_row.addWidget(self._radio_lossless)
+        extra_row.addSpacing(24)
+        extra_row.addWidget(QLabel("If larger:"))
+        self._size_group = QButtonGroup(self)
+        self._radio_skip  = QRadioButton("Skip")
+        self._radio_write = QRadioButton("Write anyway")
+        self._radio_skip.setToolTip("Don't write the .webp if it ends up bigger than the source")
+        self._radio_write.setToolTip("Always write the output even if it's larger than the source")
+        self._size_group.addButton(self._radio_skip)
+        self._size_group.addButton(self._radio_write)
+        self._radio_skip.setChecked(True)
+        extra_row.addWidget(self._radio_skip)
+        extra_row.addWidget(self._radio_write)
         extra_row.addStretch()
         layout.addLayout(extra_row)
 
@@ -258,6 +273,14 @@ class MainWindow(QMainWindow):
         self.open_folder_btn.setVisible(False)
         self.open_folder_btn.clicked.connect(self._open_output_folder)
         summary_row.addWidget(self.open_folder_btn)
+        self.delete_originals_btn = QPushButton("Delete Originals")
+        self.delete_originals_btn.setVisible(False)
+        self.delete_originals_btn.setStyleSheet(
+            "QPushButton { color: #ef5350; border-color: #ef5350; }"
+            "QPushButton:hover { background: #2a1515; border-color: #ef5350; }"
+        )
+        self.delete_originals_btn.clicked.connect(self._delete_originals)
+        summary_row.addWidget(self.delete_originals_btn)
         layout.addLayout(summary_row)
 
         # Action buttons row
@@ -328,6 +351,7 @@ class MainWindow(QMainWindow):
         self.summary_label.setVisible(False)
         self.progress_bar.setVisible(False)
         self.open_folder_btn.setVisible(False)
+        self.delete_originals_btn.setVisible(False)
 
     def _start_conversion(self):
         entries = [e for e in self.file_list.entries() if e.status == "queued"]
@@ -343,8 +367,8 @@ class MainWindow(QMainWindow):
         else:
             encoder = ENCODER_PILLOW
 
-        lossless = self.lossless_check.isChecked()
-        skip_if_larger = self.skip_larger_check.isChecked()
+        lossless = self._radio_lossless.isChecked()
+        skip_if_larger = self._radio_skip.isChecked()
 
         self.crunch_btn.setEnabled(False)
         self.open_folder_btn.setVisible(False)
@@ -384,6 +408,30 @@ class MainWindow(QMainWindow):
         self.progress_bar.setVisible(False)
         self._show_summary()
 
+    def _delete_originals(self):
+        done = [e for e in self.file_list.entries() if e.status == "done"]
+        if not done:
+            return
+        reply = QMessageBox.warning(
+            self,
+            "Delete Originals",
+            f"Permanently delete {len(done)} original file(s)?\nThis cannot be undone.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        failed = []
+        for e in done:
+            try:
+                Path(e.path).unlink()
+            except OSError as ex:
+                failed.append(f"{Path(e.path).name}: {ex}")
+        if failed:
+            QMessageBox.warning(self, "Some files could not be deleted",
+                                "\n".join(failed))
+        self.delete_originals_btn.setVisible(False)
+
     def _open_output_folder(self):
         entries = self.file_list.entries()
         done = [e for e in entries if e.status in ("done", "skipped")]
@@ -417,3 +465,4 @@ class MainWindow(QMainWindow):
         self.summary_label.setText("   ".join(parts))
         self.summary_label.setVisible(True)
         self.open_folder_btn.setVisible(True)
+        self.delete_originals_btn.setVisible(bool(done))
