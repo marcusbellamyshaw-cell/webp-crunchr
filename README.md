@@ -43,7 +43,7 @@
 - PyQt6
 - Pillow
 - pillow-heif _(optional — required for HEIC support)_
-- cwebp _(optional — install from [developers.google.com/speed/webp](https://developers.google.com/speed/webp/docs/prebuilt) and add to PATH)_
+- cwebp _(optional — see [Installing cwebp](#installing-cwebp-optional) below)_
 
 ---
 
@@ -75,6 +75,29 @@ python main.py
 3. Adjust the quality slider (lower = smaller file, higher = better quality).
 4. Click **Crunch 'em** to start batch conversion.
 5. Monitor per-file progress and the summary row at the bottom.
+
+---
+
+## Installing cwebp (optional)
+
+`cwebp` is Google's official WebP encoder. WebP Crunchr uses Pillow by default, but if `cwebp` is on your PATH the **"Use cwebp"** checkbox activates and you can use it as an alternative backend — it occasionally squeezes out a few extra percent of compression at the same quality level.
+
+**Windows — install in 3 steps:**
+
+1. Download the latest prebuilt Windows zip from Google's storage bucket:
+   ```
+   https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.6.0-windows-x64.zip
+   ```
+2. Extract the zip and copy the contents of the `bin\` folder to a permanent location, e.g. `C:\tools\cwebp\`.
+3. Add that folder to your `PATH`:
+   - Open **System Properties → Advanced → Environment Variables**
+   - Edit the **User** `Path` variable and append `C:\tools\cwebp`
+   - Open a new terminal and run `cwebp -version` to confirm
+
+WebP Crunchr auto-detects `cwebp` at startup — just restart the app after adding it to PATH.
+
+> **Does cwebp work with the compiled `.exe`?**
+> Yes — but it must be installed separately on each machine. The PyInstaller bundle does **not** include `cwebp.exe` itself; the app shells out to whatever `cwebp` it finds on the system PATH at runtime. If `cwebp` is not on PATH, the checkbox stays greyed out and Pillow is used automatically — nothing breaks.
 
 ---
 
