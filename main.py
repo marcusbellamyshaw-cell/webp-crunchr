@@ -4,10 +4,14 @@ from pathlib import Path
 
 
 def _log_error(path: str, error: str) -> None:
-    log_dir = Path(os.environ["LOCALAPPDATA"]) / "WebPCrunchr"
-    log_dir.mkdir(parents=True, exist_ok=True)
-    with open(log_dir / "errors.log", "a", encoding="utf-8") as f:
-        f.write(f"{path}: {error}\n")
+    try:
+        log_dir = Path(os.environ["LOCALAPPDATA"]) / "WebPCrunchr"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        with open(log_dir / "errors.log", "a", encoding="utf-8") as f:
+            safe_error = error.replace("\n", " ")
+            f.write(f"{path}: {safe_error}\n")
+    except Exception:
+        pass
 
 
 def run_auto_compress(paths: list[str]) -> None:
