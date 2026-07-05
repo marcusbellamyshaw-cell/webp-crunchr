@@ -52,9 +52,10 @@ def uninstall_context_menu() -> None:
 
 
 def is_installed() -> bool:
-    key_path = _shell_key_path(_EXTENSIONS[0])
-    try:
-        winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path).Close()
-        return True
-    except FileNotFoundError:
-        return False
+    for ext in _EXTENSIONS:
+        key_path = _shell_key_path(ext)
+        try:
+            winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path).Close()
+        except FileNotFoundError:
+            return False
+    return True
