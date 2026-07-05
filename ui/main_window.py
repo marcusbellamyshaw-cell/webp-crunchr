@@ -14,6 +14,7 @@ from ui.drop_zone import DropZone
 from ui.file_list import FileListWidget, FileEntry
 from core.file_utils import format_size, output_path, collect_files
 from core.converter import convert, cwebp_available, HEIC_SUPPORTED, ENCODER_PILLOW, ENCODER_CWEBP, ENCODER_BEST
+from core import shell_integration
 
 
 DARK_STYLE = """
@@ -288,6 +289,10 @@ class MainWindow(QMainWindow):
         self.clear_btn = QPushButton("Clear List")
         self.clear_btn.clicked.connect(self._clear_list)
         btn_row.addWidget(self.clear_btn)
+        self.context_menu_btn = QPushButton()
+        self.context_menu_btn.clicked.connect(self._toggle_context_menu)
+        btn_row.addWidget(self.context_menu_btn)
+        self._refresh_context_menu_btn_label()
         btn_row.addStretch()
         # Attribution link
         attr_label = QLabel('<a href="https://everybittexas.com/" style="color:#29b6f6; text-decoration:none;">Brought to you by Every Bit Texas</a>')
@@ -352,6 +357,30 @@ class MainWindow(QMainWindow):
         self.progress_bar.setVisible(False)
         self.open_folder_btn.setVisible(False)
         self.delete_originals_btn.setVisible(False)
+
+    def _refresh_context_menu_btn_label(self):
+        if shell_integration.is_installed():
+            self.context_menu_btn.setText("Remove from right-click menu")
+        else:
+            self.context_menu_btn.setText("Add to right-click menu")
+
+    def _toggle_context_menu(self):
+        try:
+            if shell_integration.is_installed():
+                shell_integration.uninstall_context_menu()
+                QMessageBox.information(
+                    self, "Context menu removed",
+                    '"Compress to WebP" removed from the right-click menu.',
+                )
+            else:
+                shell_integration.install_context_menu()
+                QMessageBox.information(
+                    self, "Context menu added",
+                    'Right-click an image in File Explorer and choose "Compress to WebP".',
+                )
+        except OSError as exc:
+            QMessageBox.warning(self, "Error", str(exc))
+        self._refresh_context_menu_btn_label()
 
     def _start_conversion(self):
         entries = [e for e in self.file_list.entries() if e.status == "queued"]
