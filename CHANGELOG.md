@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-07-04
+
+### Added
+- Windows Explorer right-click "Compress to WebP" — convert selected image(s) to WebP in place, no app window needed
+- "Add/Remove from right-click menu" button to install or remove the Explorer integration (per-user, no admin required)
+- Headless `--auto-compress` CLI mode backing the Explorer action (fixed quality 75, Best encoder, skip-if-larger; original file always kept; failures logged to `%LOCALAPPDATA%\WebPCrunchr\errors.log`)
+
+### Fixed
+- Conversion worker/thread references now reset after each run, preventing stale state from carrying into the next batch
+
 ## [1.0.0] - 2026-06-07
 
 ### Added
