@@ -390,6 +390,7 @@ class MainWindow(QMainWindow):
         self._worker.finished.connect(self._thread.quit)
         self._worker.finished.connect(self._worker.deleteLater)
         self._thread.finished.connect(self._thread.deleteLater)
+        self._thread.finished.connect(self._on_thread_cleaned_up)
         self._thread.start()
 
     def _on_progress(self, current: int, total: int):
@@ -402,6 +403,10 @@ class MainWindow(QMainWindow):
             self.file_list.update_entry(path, status="skipped")
         else:
             self.file_list.update_entry(path, status="done", output_size=output_size)
+
+    def _on_thread_cleaned_up(self):
+        self._thread = None
+        self._worker = None
 
     def _on_finished(self):
         self.crunch_btn.setEnabled(True)
