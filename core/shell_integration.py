@@ -34,6 +34,7 @@ def install_context_menu() -> None:
         key_path = _shell_key_path(ext)
         with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, key_path) as key:
             winreg.SetValueEx(key, "", 0, winreg.REG_SZ, _MENU_LABEL)
+            winreg.SetValueEx(key, "Position", 0, winreg.REG_SZ, "Top")
         with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, f"{key_path}\\command") as key:
             winreg.SetValueEx(key, "", 0, winreg.REG_SZ, command)
 
